@@ -11,8 +11,24 @@ const proxy = createProxyMiddleware({
     },
     on: {
         proxyReq: (proxyReq, req) => {
+            // Forward Request ID
             if (req.id) {
                 proxyReq.setHeader("x-request-id", req.id);
+            }
+
+            // Forward Shared Internal Secret so user-service knows request came through gateway
+            if (config.internalApiKey) {
+                proxyReq.setHeader("x-internal-key", config.internalApiKey);
+            }
+
+            // Forward verified user identity
+            if (req.user) {
+                if (req.user.id) {
+                    proxyReq.setHeader("x-user-id", String(req.user.id));
+                }
+                if (req.user.role) {
+                    proxyReq.setHeader("x-user-role", String(req.user.role));
+                }
             }
         },
         error: (err, req, res) => {
