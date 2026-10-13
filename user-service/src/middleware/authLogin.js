@@ -1,27 +1,29 @@
 const jwt = require("jsonwebtoken");
-function authlogin(req,res,next){
-    // if token is not exist in header 
-    if(!req.headers.authorization){
-        return res.status(401).send("token is not provided");
+const config = require("../config/env");
+
+function authlogin(req, res, next) {
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader) {
+        return res.status(401).json({
+            error: "Unauthorized",
+            message: "Token is not provided"
+        });
     }
-    // express stores token in header 
-    try{
-        const authHeader = req.headers.authorization.split(" ");
-        const token = authHeader[1]; // extracting the token 
 
-        // verify the token
-        const decoded = jwt.verify(
-            token,
-            process.env.JWT_SECRET
-        );
+    try {
+        const parts = authHeader.split(" ");
+        const token = parts[1];
 
-        // put userinfo into req,user
+        const decoded = jwt.verify(token, config.jwtSecret);
         req.user = decoded;
         next();
-
-    }
-    catch(err){
-        res.status(401).send("invalid token")
+    } catch {
+        return res.status(401).json({
+            error: "Unauthorized",
+            message: "Invalid or expired token"
+        });
     }
 }
-module.exports = {authlogin}
+
+module.exports = { authlogin };

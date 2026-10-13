@@ -1,34 +1,35 @@
 const jwt = require("jsonwebtoken");
-function authMiddleware(req,res,next){
-    // if token is not exist in header 
-    if(!req.headers.authorization){
-        return res.status(401).send("token is not provided");
+const config = require("../config/env");
+
+function authMiddleware(req, res, next) {
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader) {
+        return res.status(401).json({
+            error: "Unauthorized",
+            message: "Token is not provided"
+        });
     }
-    // express stores token in header 
-    try{
-        const authHeader = req.headers.authorization;
-        if(!authHeader || !authHeader.startsWith("Bearer ")){
-            return res.status(401).json({
-                message:"invalid authorization header "
-            });
-        } 
-        const token = authHeader.split(" ")[1];
 
-        // verify the token
-        const decoded = jwt.verify(
-            token,
-            process.env.JWT_SECRET
-        );
+    if (!authHeader.startsWith("Bearer ")) {
+        return res.status(401).json({
+            error: "Unauthorized",
+            message: "Invalid authorization header"
+        });
+    }
 
-        // put userinfo into req,user
+    const token = authHeader.split(" ")[1];
+
+    try {
+        const decoded = jwt.verify(token, config.jwtSecret);
         req.user = decoded;
         next();
-
-    }
-    catch(err){
-       return res.status(401).json({
-          message:"invalid or expired token"
-       });
+    } catch {
+        return res.status(401).json({
+            error: "Unauthorized",
+            message: "Invalid or expired token"
+        });
     }
 }
-module.exports = {authMiddleware};
+
+module.exports = { authMiddleware };

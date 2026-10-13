@@ -1,7 +1,11 @@
-function isAdmin(req,res,next){
-    if(req.user.role !== "admin"){
-        return res.status(403).send("access denied") // 403 is for forbidden --> you are auithenticated but you dont have permission 
+function isAdmin(req, res, next) {
+    if (!req.user || req.user.role !== "admin") {
+        return res.status(403).json({
+            error: "Forbidden",
+            message: "Access denied"
+        });
     }
     next();
 }
-module.exports = {isAdmin};
+
+module.exports = { isAdmin };
