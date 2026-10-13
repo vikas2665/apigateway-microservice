@@ -17,6 +17,7 @@ if (trustProxyEnv !== undefined) {
     }
 }
 
+const requestIdMiddleware = require('./middleware/requestId');
 const rateLimiter = require('./middleware/ratelimitter');
 const proxy = require('./middleware/proxy');
 const logger = require('./middleware/requestLogging');
@@ -27,7 +28,8 @@ const { connectRedis } = require("./config/redis");
 
 const { globalRateLimiter, authRateLimiter } = rateLimiter;
 
-// 1. Request logging for all requests
+// 1. Assign unique X-Request-Id and log incoming request
+app.use(requestIdMiddleware);
 app.use(logger);
 
 // 2. Stricter rate limiting for authentication endpoints (/api/users/login & /api/users/register)
