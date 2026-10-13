@@ -4,8 +4,9 @@ const http = require("node:http");
 const jwt = require("jsonwebtoken");
 const { app } = require("../src/app");
 const { redisClient } = require("../src/config/redis");
+const config = require("../src/config/env");
 
-const JWT_SECRET = process.env.JWT_SECRET || "mysecretkey";
+const JWT_SECRET = config.jwtSecret;
 
 function makeRequest(server, options, bodyData = null) {
     return new Promise((resolve, reject) => {
@@ -52,7 +53,6 @@ test("API Gateway integration tests", async (t) => {
     const originalEval = redisClient.eval;
 
     t.before(() => {
-        // Mock redisClient.eval by default for fast in-memory rate limiting tests
         redisClient.eval = async () => [1, 60];
         server = http.createServer(app);
         return new Promise((resolve) => server.listen(0, resolve));
@@ -63,13 +63,46 @@ test("API Gateway integration tests", async (t) => {
         return new Promise((resolve) => server.close(resolve));
     });
 
-    await t.test("rejects /api/users/profile when no authorization header is provided", async () => {
+    await t.test("GET /health reports service status and Redis connectivity", async () => {
+        const res = await makeRequest(server, { path: "/health" });
+        assert.ok([200, 503].includes(res.statusCode));
+        assert.equal(res.body.service, "api-gateway");
+        assert.ok(["healthy", "degraded"].includes(res.body.status));
+        assert.ok(["connected", "disconnected"].includes(res.body.redis));
+        assert.ok(res.body.timestamp);
+    });
+
+    await t.test("applies helmet security headers and CORS headers", async () => {
+        const res = await makeRequest(server, { path: "/health" });
+        assert.equal(res.headers["x-content-type-options"], "nosniff");
+        assert.ok(res.headers["access-control-allow-origin"] !== undefined);
+    });
+
+    await t.test("generates or propagates X-Request-Id header", async () => {
+        // Without incoming header
+        const res1 = await makeRequest(server, { path: "/health" });
+        assert.ok(res1.headers["x-request-id"]);
+
+        // With incoming header
+        const customId = "custom-uuid-test-12345";
+        const res2 = await makeRequest(server, {
+            path: "/health",
+            headers: { "x-request-id": customId }
+        });
+        assert.equal(res2.headers["x-request-id"], customId);
+    });
+
+    await t.test("rejects /api/users/profile with uniform JSON 401 when no token provided", async () => {
         const res = await makeRequest(server, { path: "/api/users/profile" });
         assert.equal(res.statusCode, 401);
+        assert.deepEqual(res.body, {
+            error: "Unauthorized",
+            message: "Token is not provided"
+        });
         assert.equal(res.headers["x-ratelimit-limit"], "100");
     });
 
-    await t.test("rejects /api/users/admin when user is not admin", async () => {
+    await t.test("rejects /api/users/admin with uniform JSON 403 when user is not admin", async () => {
         const userToken = jwt.sign({ id: "123", role: "user" }, JWT_SECRET);
         const res = await makeRequest(server, {
             path: "/api/users/admin",
@@ -78,7 +111,10 @@ test("API Gateway integration tests", async (t) => {
             }
         });
         assert.equal(res.statusCode, 403);
-        assert.equal(res.body.message, "Access denied");
+        assert.deepEqual(res.body, {
+            error: "Forbidden",
+            message: "Access denied"
+        });
     });
 
     await t.test("rate limit headers are present on /api routes", async () => {
@@ -90,7 +126,6 @@ test("API Gateway integration tests", async (t) => {
     });
 
     await t.test("returns 429 when rate limit is exceeded on /api/users/login", async () => {
-        // authRateLimiter triggers when count > 5
         redisClient.eval = async () => [6, 42];
 
         const res = await makeRequest(server, {
@@ -127,6 +162,25 @@ test("API Gateway integration tests", async (t) => {
         assert.deepEqual(res.body, {
             error: "Too many requests",
             retryAfter: 38
+        });
+    });
+
+    await t.test("returns 502 Bad Gateway when downstream service is offline", async () => {
+        const userToken = jwt.sign({ id: "123", role: "user" }, JWT_SECRET);
+        redisClient.eval = async () => [1, 60];
+
+        // Hit a route that proxies to user-service (which is offline during unit test)
+        const res = await makeRequest(server, {
+            path: "/api/users/profile",
+            headers: {
+                Authorization: `Bearer ${userToken}`
+            }
+        });
+
+        assert.equal(res.statusCode, 502);
+        assert.deepEqual(res.body, {
+            error: "BadGateway",
+            message: "User service is unavailable"
         });
     });
 });
