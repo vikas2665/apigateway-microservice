@@ -25,20 +25,34 @@ const { authMiddleware } = require("./middleware/authMiddleware");
 const { isAdmin } = require('./middleware/isAdmin');
 const { connectRedis } = require("./config/redis");
 
+const { globalRateLimiter, authRateLimiter } = rateLimiter;
+
+// 1. Request logging for all requests
 app.use(logger);
 
+// 2. Stricter rate limiting for authentication endpoints (/api/users/login & /api/users/register)
+app.use("/api/users/login", authRateLimiter);
+app.use("/api/users/register", authRateLimiter);
+
+// 3. Global rate limiting applied to all /api routes before auth and proxy
+app.use("/api", globalRateLimiter);
+
+// 4. Authenticated & Authorized routes
 app.get("/api/users/profile",
-    rateLimiter,
     authMiddleware,
     proxy
 );
+
 app.get("/api/users/admin",
     authMiddleware,
     isAdmin,
-    proxy,
+    proxy
 );
+
+// 5. Proxy all remaining /api routes to user-service
 app.use("/api", proxy);
 
+// 6. Centralized error handling
 app.use(errorHandler);
 
 async function startServer() {
