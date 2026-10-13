@@ -196,21 +196,28 @@ The role is extracted from the verified JWT.
 
 ## ⏱️ Rate Limiting
 
-The API Gateway currently implements an IP-based rate limiter.
+The API Gateway implements a distributed, Redis-backed rate limiter using an **atomic Lua script**:
 
-The current implementation tracks:
-
-```text
-IP Address
-Request Count
-Window Start Time
-```
-
-The purpose is to prevent a client from sending an excessive number of requests within a short period.
-
-The current implementation uses an in-memory JavaScript object.
-
-A future version will replace this with **Redis** to support shared rate-limiting state across multiple Gateway instances.
+* **Atomic Counter & Expiry:** Combines `INCR`, conditional `EXPIRE`, and `TTL` check into a single Lua script execution via `eval`. This prevents race conditions and crashes from leaving keys without a TTL.
+* **Route Coverage:**
+  * **Global Limit:** Applied to all `/api` routes (default: `100` requests per `60` seconds) before authentication and proxying.
+  * **Stricter Auth Limit:** Applied to `/api/users/login` and `/api/users/register` (default: `5` requests per `60` seconds) to mitigate brute-force and credential stuffing attacks.
+* **Accurate IP Resolution (`trust proxy`):** Configurable `TRUST_PROXY` setting ensures `req.ip` reflects the actual client IP when deployed behind reverse proxies or load balancers.
+* **429 Response Format:**
+  ```json
+  {
+    "error": "Too many requests",
+    "retryAfter": 58
+  }
+  ```
+* **Rate Limit Headers:**
+  * `Retry-After`: Remaining time in seconds before retry is allowed (matching Redis TTL).
+  * `X-RateLimit-Limit`: Maximum requests permitted within the window.
+  * `X-RateLimit-Remaining`: Number of requests remaining in current window (`0` when exceeded).
+  * `X-RateLimit-Reset`: Remaining window duration in seconds (matching Redis TTL).
+* **Configurable Redis-Down Behavior (`RATE_LIMIT_FAIL_OPEN`):**
+  * **Default: `true` (Fail-Open)**: If Redis is unreachable or encounters an error, the error is logged and the request is permitted to proceed, preventing a Redis outage from taking down the API.
+  * Set to `false` (Fail-Closed) if you prefer rejecting requests with a `500` error during Redis downtime.
 
 ## 📋 Request Logging
 
@@ -297,16 +304,37 @@ API-GATEWAY-RATELIMITTER/
 
 ## ⚙️ Environment Variables
 
-Sensitive configuration is stored in `.env` files and is not committed to Git.
+Sensitive configuration is stored in `.env` files (see `.env.example` in each service) and is not committed to Git.
 
-Example:
+### API Gateway (`api-gateway/.env`)
 
 ```env
-MONGO_URI=your_mongodb_connection_string
+PORT=5000
+USER_SERVICE_URL=http://localhost:5001
 JWT_SECRET=your_jwt_secret
+REDIS_URL=redis://localhost:6379
+TRUST_PROXY=false
+
+# Global Rate Limiting (all /api routes)
+RATE_LIMIT_MAX=100
+RATE_LIMIT_WINDOW=60
+
+# Auth Route Rate Limiting (/api/users/login, /api/users/register)
+AUTH_RATE_LIMIT_MAX=5
+AUTH_RATE_LIMIT_WINDOW=60
+
+# Redis-down behavior: true = fail-open (allow requests), false = fail-closed (return 500)
+# Default: true
+RATE_LIMIT_FAIL_OPEN=true
 ```
 
-Do not commit real credentials or secrets to GitHub.
+### User Service (`user-service/.env`)
+
+```env
+PORT=5001
+JWT_SECRET=your_jwt_secret
+MONGO_URI=mongodb://127.0.0.1:27017/gateway_project
+```
 
 ## ▶️ Running the Project
 
