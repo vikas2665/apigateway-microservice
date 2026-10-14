@@ -27,7 +27,7 @@ app.use(cors(corsOptions));
 
 const requestIdMiddleware = require("./middleware/requestId");
 const rateLimiter = require("./middleware/ratelimitter");
-const proxy = require("./middleware/proxy");
+const { userProxy, productProxy } = require("./middleware/proxy");
 const logger = require("./middleware/requestLogging");
 const errorHandler = require("./middleware/errorHandler");
 const { authMiddleware } = require("./middleware/authMiddleware");
@@ -69,22 +69,31 @@ app.use("/api/users/register", authRateLimiter);
 // 4. Global rate limiting applied to all /api routes before auth and proxy
 app.use("/api", globalRateLimiter);
 
-// 5. Authenticated & Authorized routes
+// 5. Product Service Routes (protected with JWT, write operations admin-only)
+app.post("/api/products", authMiddleware, isAdmin, productProxy);
+app.put("/api/products/*", authMiddleware, isAdmin, productProxy);
+app.delete("/api/products/*", authMiddleware, isAdmin, productProxy);
+app.get("/api/products", authMiddleware, productProxy);
+app.get("/api/products/*", authMiddleware, productProxy);
+app.use("/api/products", authMiddleware, productProxy);
+
+// 6. User Service Authenticated & Authorized routes
 app.get("/api/users/profile",
     authMiddleware,
-    proxy
+    userProxy
 );
 
 app.get("/api/users/admin",
     authMiddleware,
     isAdmin,
-    proxy
+    userProxy
 );
 
-// 6. Proxy all remaining /api routes to user-service
-app.use("/api", proxy);
+// 7. Proxy all remaining user and /api routes to user-service
+app.use("/api/users", userProxy);
+app.use("/api", userProxy);
 
-// 7. Centralized error handling
+// 8. Centralized error handling
 app.use(errorHandler);
 
 async function startServer() {
