@@ -7,14 +7,12 @@ const serviceRoutes = [
     {
         name: "user-service",
         prefix: "/api/users",
-        target: config.userServiceUrl,
-        pathRewrite: { "^/api": "" }
+        target: config.userServiceUrl
     },
     {
         name: "product-service",
         prefix: "/api/products",
-        target: config.productServiceUrl,
-        pathRewrite: { "^/api": "" }
+        target: config.productServiceUrl
     }
 ];
 

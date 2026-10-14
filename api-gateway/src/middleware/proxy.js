@@ -7,7 +7,12 @@ const serviceRoutes = require("../config/routes");
  * Configured with timeouts, request ID propagation, internal secret injection,
  * user identity forwarding, and uniform 502/504 error handling.
  */
-function createServiceProxy(target, serviceName = "upstream service", pathRewrite = { "^/api": "" }) {
+function defaultPathRewrite(path, req) {
+    const original = req && req.originalUrl ? req.originalUrl : path;
+    return original.replace(/^\/api/, "");
+}
+
+function createServiceProxy(target, serviceName = "upstream service", pathRewrite = defaultPathRewrite) {
     return createProxyMiddleware({
         target,
         changeOrigin: true,
