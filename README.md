@@ -5,7 +5,7 @@
 [![Docker](https://img.shields.io/badge/Docker-Compose-2496ED.svg)](https://www.docker.com/)
 [![MongoDB](https://img.shields.io/badge/Database-MongoDB-47A248.svg)](https://www.mongodb.com/)
 [![Redis](https://img.shields.io/badge/Cache%20%26%20Limiter-Redis-DC382D.svg)](https://redis.io/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 
 A production-grade, distributed microservices architecture built with **Node.js, Express 5, Redis, and MongoDB**. This repository features a centralized **API Gateway** managing traffic to downstream microservices (**User Service** and **Product Service**) with distributed rate limiting, JWT authentication, role-based access control, downstream identity propagation, internal service key verification, proxy resilience, and full containerization with Docker Compose.
 
@@ -30,7 +30,7 @@ A production-grade, distributed microservices architecture built with **Node.js,
   - [Authentication & User Endpoints](#authentication--user-endpoints)
   - [Product Endpoints](#product-endpoints)
 - [Automated Testing](#-automated-testing)
-- [License](#-license)
+
 
 ---
 
@@ -584,6 +584,4 @@ npm test --prefix product-service
 
 ---
 
-## 📄 License
 
-This project is licensed under the [MIT License](LICENSE).
