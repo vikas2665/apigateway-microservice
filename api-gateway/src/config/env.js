@@ -39,6 +39,7 @@ function validateAndLoadConfig() {
     }
 
     const userServiceUrl = parseUrl(process.env.USER_SERVICE_URL, "http://localhost:5001", "USER_SERVICE_URL");
+    const productServiceUrl = parseUrl(process.env.PRODUCT_SERVICE_URL, "http://localhost:5002", "PRODUCT_SERVICE_URL");
     const redisUrl = process.env.REDIS_URL || "redis://localhost:6379";
     const jwtSecret = process.env.JWT_SECRET || "mysecretkey";
     const internalApiKey = process.env.INTERNAL_API_KEY || "gateway-internal-secret-key";
@@ -56,6 +57,7 @@ function validateAndLoadConfig() {
     return {
         port,
         userServiceUrl,
+        productServiceUrl,
         redisUrl,
         jwtSecret,
         internalApiKey,
