@@ -338,7 +338,29 @@ MONGO_URI=mongodb://127.0.0.1:27017/gateway_project
 
 ## ▶️ Running the Project
 
-### 1. Install dependencies
+### Option A: Run with Docker Compose (Recommended)
+
+From a fresh clone, run the entire stack with zero manual configuration:
+
+```bash
+docker compose up --build
+```
+
+This will automatically:
+1. Start **MongoDB** and wait for its healthcheck (`mongosh ping`) to pass.
+2. Start **Redis** and wait for its healthcheck (`redis-cli ping`) to pass.
+3. Build and launch **User Service**, waiting for its healthcheck to pass.
+4. Build and launch **API Gateway**, connecting to Redis and User Service.
+5. **Port Isolation:** Only port `5000` (API Gateway) is published to the host. MongoDB, Redis, and User Service are fully protected inside the private container bridge network (`app_network`).
+
+To stop all containers:
+```bash
+docker compose down
+```
+
+### Option B: Run Locally Without Docker
+
+#### 1. Install dependencies
 
 Install dependencies for the API Gateway and User Service:
 
