@@ -69,13 +69,17 @@ app.use("/api/users/register", authRateLimiter);
 // 4. Global rate limiting applied to all /api routes before auth and proxy
 app.use("/api", globalRateLimiter);
 
-// 5. Product Service Routes (protected with JWT, write operations admin-only)
-app.post("/api/products", authMiddleware, isAdmin, productProxy);
-app.put("/api/products/*", authMiddleware, isAdmin, productProxy);
-app.delete("/api/products/*", authMiddleware, isAdmin, productProxy);
-app.get("/api/products", authMiddleware, productProxy);
-app.get("/api/products/*", authMiddleware, productProxy);
-app.use("/api/products", authMiddleware, productProxy);
+// 5. Product Service Router (protected with JWT, write operations admin-only)
+const productRouter = express.Router();
+productRouter.use(authMiddleware);
+productRouter.post("/", isAdmin, productProxy);
+productRouter.put("/:id", isAdmin, productProxy);
+productRouter.delete("/:id", isAdmin, productProxy);
+productRouter.get("/", productProxy);
+productRouter.get("/:id", productProxy);
+productRouter.use(productProxy);
+
+app.use("/api/products", productRouter);
 
 // 6. User Service Authenticated & Authorized routes
 app.get("/api/users/profile",

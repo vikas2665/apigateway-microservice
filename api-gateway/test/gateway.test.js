@@ -169,7 +169,6 @@ test("API Gateway integration tests", async (t) => {
         const userToken = jwt.sign({ id: "123", role: "user" }, JWT_SECRET);
         redisClient.eval = async () => [1, 60];
 
-        // Hit a route that proxies to user-service (which is offline during unit test)
         const res = await makeRequest(server, {
             path: "/api/users/profile",
             headers: {
@@ -180,7 +179,96 @@ test("API Gateway integration tests", async (t) => {
         assert.equal(res.statusCode, 502);
         assert.deepEqual(res.body, {
             error: "BadGateway",
-            message: "User service is unavailable"
+            message: "user-service is unavailable"
+        });
+    });
+
+    await t.test("rejects /api/products with uniform 401 when unauthenticated", async () => {
+        const res = await makeRequest(server, { path: "/api/products" });
+        assert.equal(res.statusCode, 401);
+        assert.deepEqual(res.body, {
+            error: "Unauthorized",
+            message: "Token is not provided"
+        });
+    });
+
+    await t.test("rejects POST /api/products with uniform 403 when user is not admin", async () => {
+        const userToken = jwt.sign({ id: "user-1", role: "user" }, JWT_SECRET);
+        const res = await makeRequest(
+            server,
+            {
+                path: "/api/products",
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${userToken}`
+                }
+            },
+            { name: "Gadget", price: 99.99 }
+        );
+        assert.equal(res.statusCode, 403);
+        assert.deepEqual(res.body, {
+            error: "Forbidden",
+            message: "Access denied"
+        });
+    });
+
+    await t.test("rejects PUT /api/products/123 with uniform 403 when user is not admin", async () => {
+        const userToken = jwt.sign({ id: "user-1", role: "user" }, JWT_SECRET);
+        const res = await makeRequest(
+            server,
+            {
+                path: "/api/products/123",
+                method: "PUT",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${userToken}`
+                }
+            },
+            { name: "Updated Gadget" }
+        );
+        assert.equal(res.statusCode, 403);
+        assert.deepEqual(res.body, {
+            error: "Forbidden",
+            message: "Access denied"
+        });
+    });
+
+    await t.test("rejects DELETE /api/products/123 with uniform 403 when user is not admin", async () => {
+        const userToken = jwt.sign({ id: "user-1", role: "user" }, JWT_SECRET);
+        const res = await makeRequest(server, {
+            path: "/api/products/123",
+            method: "DELETE",
+            headers: {
+                Authorization: `Bearer ${userToken}`
+            }
+        });
+        assert.equal(res.statusCode, 403);
+        assert.deepEqual(res.body, {
+            error: "Forbidden",
+            message: "Access denied"
+        });
+    });
+
+    await t.test("POST /api/products allows admin user to pass isAdmin and routes to product-service", async () => {
+        const adminToken = jwt.sign({ id: "admin-1", role: "admin" }, JWT_SECRET);
+        const res = await makeRequest(
+            server,
+            {
+                path: "/api/products",
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${adminToken}`
+                }
+            },
+            { name: "Super Product", price: 199.99 }
+        );
+        // Product service is offline during this isolated unit test, so it reaches proxy and returns 502 for product-service
+        assert.equal(res.statusCode, 502);
+        assert.deepEqual(res.body, {
+            error: "BadGateway",
+            message: "product-service is unavailable"
         });
     });
 });
